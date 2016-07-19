@@ -1,15 +1,11 @@
-Resque Lock Timeout
+ActiveJob Lock
 ===================
 
-[![Build Status](https://secure.travis-ci.org/lantins/resque-lock-timeout.png?branch=master)](http://travis-ci.org/lantins/resque-lock-timeout)
-[![Gem Version](https://badge.fury.io/rb/resque-lock-timeout.png)](http://badge.fury.io/rb/resque-lock-timeout)
+An [ActiveJob][activejob] plugin.
 
-A [Resque][rq] plugin. Requires Resque >= v1.8.0.
+active_job_lock adds locking, with optional timeout/deadlock handling.
 
-resque-lock-timeout adds locking, with optional timeout/deadlock handling to
-resque jobs.
-
-Using a `lock_timeout` allows you to re-acquire the lock should your worker
+Using a `lock_timeout` allows you to re-acquire the lock should your job
 fail, crash, or is otherwise unable to release the lock. **i.e.** Your server
 unexpectedly loses power. Very handy for jobs that are recurring or may be
 retried.
@@ -21,13 +17,12 @@ Usage / Examples
 
 ### Single Job Instance
 
-    require 'resque-lock-timeout'
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+      queue_as :network_graph
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
@@ -47,13 +42,13 @@ Please see below for more information about the identifier/lock key.
 Setting the `@loner` boolean to `true` will ensure the job is not enqueued if
 the job (identified by the `identifier` method) is already running/enqueued.
 
-    class LonelyJob
-      extend Resque::Plugins::LockTimeout
-      @queue = :loners
+    class LonelyJob < ActiveJob::Base
+      include ActiveJobLock::Core
 
-      @loner = true
+      queue_as :loners
+      lock loner: true
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
@@ -65,14 +60,14 @@ documentation.
 
 Simply set the lock timeout in seconds, e.g.
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
 
+      queue_as :network_graph
       # Lock may be held for up to an hour.
-      @lock_timeout = 3600
+      lock timeout: 3600
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
@@ -89,16 +84,17 @@ The default identifier is just your job arguments joined with a dash `-`.
 If you have a lot of arguments or really long ones, you should consider
 overriding `identifier` to define a more precise or loose custom identifier:
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
+
+      queue_as :network_graph
 
       # Run only one at a time, regardless of repo_id.
-      def self.identifier(repo_id)
+      def identifier(repo_id)
         nil
       end
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
@@ -111,19 +107,20 @@ Its lock key would be: `lock:UpdateNetworkGraph` (the `:<identifier>` part is le
 
 You can define the entire key by overriding `redis_lock_key`:
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
 
-      def self.redis_lock_key(repo_id)
+      queue_as :network_graph
+
+      def redis_lock_key(repo_id)
         "lock:updates"
       end
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
-    
+
 That would use the key `lock:updates`.
 
 ### Redis Connection Used for Locking
@@ -149,15 +146,16 @@ change this you may override `lock_redis`.
 You may define the `lock_timeout` method to adjust the timeout at runtime
 using job arguments. e.g.
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
 
-      def self.lock_timeout(repo_id, timeout_minutes)
+      queue_as :network_graph
+
+      def lock_timeout(repo_id, timeout_minutes)
         60 * timeout_minutes
       end
 
-      def self.perform(repo_id, timeout_minutes = 1)
+      def perform(repo_id, timeout_minutes = 1)
         heavy_lifting
       end
     end
@@ -174,34 +172,30 @@ using job arguments. e.g.
 
 Several callbacks are available to override and implement your own logic, e.g.
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::Lock
-      @queue = :network_graph
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
 
-      # Lock may be held for up to an hour.
-      @lock_timeout = 3600
-
-      # No same job get enqueued if one already running/enqueued
-      @loner = true
+      queue_as :network_graph
+      lock timeout: 3600, loner: true
 
       # Job failed to acquire lock. You may implement retry or other logic.
-      def self.lock_failed(repo_id)
+      def lock_failed(repo_id)
         raise LockFailed
       end
 
       # Unable to enqueue job because its running or already enqueued.
-      def self.loner_enqueue_failed(repo_id)
+      def loner_enqueue_failed(repo_id)
         raise EnqueueFailed
       end
 
       # Job has complete; but the lock expired before we could release it.
       # The lock wasn't released; as its *possible* the lock is now held
       # by another job.
-      def self.lock_expired_before_release(repo_id)
+      def lock_expired_before_release(repo_id)
         handle_if_needed
       end
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
@@ -209,16 +203,13 @@ Several callbacks are available to override and implement your own logic, e.g.
 Install
 =======
 
-    $ gem install resque-lock-timeout
+    $ gem install active_job_lock
 
 Acknowledgements
 ================
 
-Forked from Chris Wanstrath' [resque-lock][resque-lock] plugin.
-Lock timeout from Ryan Carvar' [resque-lock-retry][resque-lock-retry] plugin.
-And a little tinkering from Luke Antins.
+Forked and adapted from Luke Antins' [resque-lock-timeout v0.4.5][resque-lock-timeout] plugin.
 
-[rq]: http://github.com/defunkt/resque
+[activejob]: https://github.com/rails/rails/tree/master/activejob
+[resque-lock-timeout]: https://github.com/lantins/resque-lock-timeout/tree/v0.4.5
 [redis-setnx]: http://redis.io/commands/setnx
-[resque-lock]: http://github.com/defunkt/resque-lock
-[resque-lock-retry]: http://github.com/rcarver/resque-lock-retry
