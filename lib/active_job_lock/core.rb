@@ -128,7 +128,7 @@ module ActiveJobLock
     #
     # @return [Redis] redis object
     def lock_redis
-      Resque.redis
+      @lock_redis ||= ActiveJobLock::Config.redis
     end
 
     # Override to fully control the lock key used. It is passed

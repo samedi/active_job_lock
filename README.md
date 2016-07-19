@@ -125,18 +125,25 @@ That would use the key `lock:updates`.
 
 ### Redis Connection Used for Locking
 
-By default all locks are stored via Resque's redis connection. If you wish to
-change this you may override `lock_redis`.
+By default all locks are stored via a Redis client. For that, you have to tell `ActiveJobLock`
+which client it should use. Set that through an initializer:
 
-    class UpdateNetworkGraph
-      extend Resque::Plugins::LockTimeout
-      @queue = :network_graph
+    # config/initializers/active_job_lock.rb
 
-      def self.lock_redis
-        @lock_redis ||= Redis.new
+    ActiveJobLock::Config.redis = Redis.new(redis_config)
+
+If you want, you can then override it per job instance by doing:
+
+    class UpdateNetworkGraph < ActiveJob::Base
+      include ActiveJobLock::Core
+
+      queue_as :network_graph
+
+      def lock_redis
+        @lock_redis ||= CustomRedis.new
       end
 
-      def self.perform(repo_id)
+      def perform(repo_id)
         heavy_lifting
       end
     end
