@@ -16,5 +16,5 @@ YARD::Rake::YardocTask.new :yardoc do |t|
     t.options = ['--output-dir', 'doc/',
                  '--files', 'LICENSE,HISTORY.md',
                  '--readme', 'README.md',
-                 '--title', 'resque-lock-timeout documentation']
+                 '--title', 'active_job_lock documentation']
 end

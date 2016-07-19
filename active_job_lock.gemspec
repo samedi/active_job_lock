@@ -1,12 +1,12 @@
 Gem::Specification.new do |s|
-  s.name              = 'resque-lock-timeout'
-  s.version           = '0.4.5'
+  s.name              = 'active_job_lock'
+  s.version           = ActiveJobLock::VERSION
   s.date              = Time.now.strftime('%Y-%m-%d')
-  s.summary           = 'A Resque plugin adding locking, with optional timeout/deadlock handling to resque jobs.'
+  s.summary           = 'An ActiveJob plugin to add locking, with optional timeout/deadlock handling.'
   s.license           = 'MIT'
-  s.homepage          = 'http://github.com/lantins/resque-lock-timeout'
-  s.email             = 'luke@lividpenguin.com'
-  s.authors           = ['Luke Antins', 'Ryan Carver', 'Chris Wanstrath']
+  s.homepage          = 'http://github.com/dferrazm/active_job_lock'
+  s.email             = ''
+  s.authors           = ['Daniel Ferraz', 'Luke Antins']
   s.has_rdoc          = false
 
   s.files             = %w(README.md Rakefile LICENSE HISTORY.md)
@@ -20,12 +20,11 @@ Gem::Specification.new do |s|
   s.add_development_dependency('simplecov', '~> 0.7', '>= 0.7.1')
 
   s.description       = <<desc
-  A Resque plugin. Adds locking, with optional timeout/deadlock handling to
-  resque jobs.
+  An ActiveJob plugin. Adds locking, with optional timeout/deadlock handling.
 
-  Using a `lock_timeout` allows you to re-acquire the lock should your worker
+  Using a `lock_timeout` allows you to re-acquire the lock should your job
   fail, crash, or is otherwise unable to relase the lock.
-  
+
   i.e. Your server unexpectedly looses power. Very handy for jobs that are
   recurring or may be retried.
 desc
