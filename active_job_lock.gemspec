@@ -1,3 +1,6 @@
+$:.push File.expand_path("../lib", __FILE__)
+require 'active_job_lock/version'
+
 Gem::Specification.new do |s|
   s.name              = 'active_job_lock'
   s.version           = ActiveJobLock::VERSION
