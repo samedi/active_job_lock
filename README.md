@@ -1,9 +1,7 @@
 ActiveJob Lock
 ===================
 
-An [ActiveJob][activejob] plugin.
-
-active_job_lock adds locking, with optional timeout/deadlock handling.
+An [ActiveJob][activejob] plugin that adds locking, with optional timeout/deadlock handling.
 
 Using a `lock_timeout` allows you to re-acquire the lock should your job
 fail, crash, or is otherwise unable to release the lock. **i.e.** Your server
@@ -17,15 +15,17 @@ Usage / Examples
 
 ### Single Job Instance
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
+  queue_as :network_graph
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 Locking is achieved by storing a identifier/lock key in Redis.
 
@@ -42,16 +42,18 @@ Please see below for more information about the identifier/lock key.
 Setting the `@loner` boolean to `true` will ensure the job is not enqueued if
 the job (identified by the `identifier` method) is already running/enqueued.
 
-    class LonelyJob < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class LonelyJob < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :loners
-      lock loner: true
+  queue_as :loners
+  lock loner: true
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 ### Lock Expiry/Timeout
 
@@ -60,17 +62,19 @@ documentation.
 
 Simply set the lock timeout in seconds, e.g.
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
-      # Lock may be held for up to an hour.
-      lock timeout: 3600
+  queue_as :network_graph
+  # Lock may be held for up to an hour.
+  lock timeout: 3600
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 Customize & Extend
 ==================
@@ -84,20 +88,22 @@ The default identifier is just your job arguments joined with a dash `-`.
 If you have a lot of arguments or really long ones, you should consider
 overriding `identifier` to define a more precise or loose custom identifier:
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
+  queue_as :network_graph
 
-      # Run only one at a time, regardless of repo_id.
-      def identifier(repo_id)
-        nil
-      end
+  # Run only one at a time, regardless of repo_id.
+  def identifier(repo_id)
+    nil
+  end
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 The above modification will ensure only one job of class
 UpdateNetworkGraph is running at a time, regardless of the
@@ -107,19 +113,21 @@ Its lock key would be: `lock:UpdateNetworkGraph` (the `:<identifier>` part is le
 
 You can define the entire key by overriding `redis_lock_key`:
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
+  queue_as :network_graph
 
-      def redis_lock_key(repo_id)
-        "lock:updates"
-      end
+  def redis_lock_key(repo_id)
+    "lock:updates"
+  end
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 That would use the key `lock:updates`.
 
@@ -128,44 +136,50 @@ That would use the key `lock:updates`.
 By default all locks are stored via a Redis client. For that, you have to tell `ActiveJobLock`
 which client it should use. Set that through an initializer:
 
-    # config/initializers/active_job_lock.rb
+```ruby
+# config/initializers/active_job_lock.rb
 
-    ActiveJobLock::Config.redis = Redis.new(redis_config)
+ActiveJobLock::Config.redis = Redis.new(redis_config)
+```
 
 If you want, you can then override it per job instance by doing:
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
+  queue_as :network_graph
 
-      def lock_redis
-        @lock_redis ||= CustomRedis.new
-      end
+  def lock_redis
+    @lock_redis ||= CustomRedis.new
+  end
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 ### Setting Timeout At Runtime
 
 You may define the `lock_timeout` method to adjust the timeout at runtime
 using job arguments. e.g.
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
+  queue_as :network_graph
 
-      def lock_timeout(repo_id, timeout_minutes)
-        60 * timeout_minutes
-      end
+  def lock_timeout(repo_id, timeout_minutes)
+    60 * timeout_minutes
+  end
 
-      def perform(repo_id, timeout_minutes = 1)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id, timeout_minutes = 1)
+    heavy_lifting
+  end
+end
+```
 
 ### Helper Methods
 
@@ -179,33 +193,35 @@ using job arguments. e.g.
 
 Several callbacks are available to override and implement your own logic, e.g.
 
-    class UpdateNetworkGraph < ActiveJob::Base
-      include ActiveJobLock::Core
+```ruby
+class UpdateNetworkGraph < ActiveJob::Base
+  include ActiveJobLock::Core
 
-      queue_as :network_graph
-      lock timeout: 3600, loner: true
+  queue_as :network_graph
+  lock timeout: 3600, loner: true
 
-      # Job failed to acquire lock. You may implement retry or other logic.
-      def lock_failed(repo_id)
-        raise LockFailed
-      end
+  # Job failed to acquire lock. You may implement retry or other logic.
+  def lock_failed(repo_id)
+    raise LockFailed
+  end
 
-      # Unable to enqueue job because its running or already enqueued.
-      def loner_enqueue_failed(repo_id)
-        raise EnqueueFailed
-      end
+  # Unable to enqueue job because its running or already enqueued.
+  def loner_enqueue_failed(repo_id)
+    raise EnqueueFailed
+  end
 
-      # Job has complete; but the lock expired before we could release it.
-      # The lock wasn't released; as its *possible* the lock is now held
-      # by another job.
-      def lock_expired_before_release(repo_id)
-        handle_if_needed
-      end
+  # Job has complete; but the lock expired before we could release it.
+  # The lock wasn't released; as its *possible* the lock is now held
+  # by another job.
+  def lock_expired_before_release(repo_id)
+    handle_if_needed
+  end
 
-      def perform(repo_id)
-        heavy_lifting
-      end
-    end
+  def perform(repo_id)
+    heavy_lifting
+  end
+end
+```
 
 Install
 =======
