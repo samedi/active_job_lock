@@ -3,7 +3,7 @@ module ActiveJobLock
   # include this module:
   #
   #   class UpdateNetworkGraph < ActiveJob::Base
-  #     include ActiveJobLock
+  #     include ActiveJobLock::Core
   #     queue_as :network_graph
   #
   #     def perform(repo_id)
@@ -15,11 +15,11 @@ module ActiveJobLock
   # set/override `lock_timeout`. e.g.
   #
   #   class UpdateNetworkGraph < ActiveJob::Base
-  #     include ActiveJobLock
+  #     include ActiveJobLock::Core
   #     queue_as :network_graph
   #
   #     # lock may be held for upto an hour.
-  #     lock_timeout 3600
+  #     lock timeout: 3600
   #
   #     def perform(repo_id)
   #       heavy_lifting
@@ -30,7 +30,7 @@ module ActiveJobLock
   # enqueued or running, you can set/override `loner`. e.g.
   #
   #   class PdfExport < ActiveJob::Base
-  #     include ActiveJobLock
+  #     include ActiveJobLock::Core
   #     queue_as :exports
   #
   #     # only one job can be running/enqueued at a time. For instance a button
@@ -39,7 +39,7 @@ module ActiveJobLock
   #     #   - the same export is not currently running
   #     #   - the same export is not currently queued.
   #     # ('same' being defined by `identifier`)
-  #     loner true
+  #     lock loner: true
   #
   #     def perform(repo_id)
   #       heavy_lifting
@@ -47,10 +47,21 @@ module ActiveJobLock
   #   end
   module Core
     def self.included(base)
+      base.extend(ClassMethods)
+
       # Attach handler around the perform method to deal with the locking
       #
       base.class_eval do
         around_perform { |job| job.perform_with_lock }
+      end
+    end
+
+    module ClassMethods
+      attr_accessor :lock_timeout, :loner
+
+      def lock(options = {})
+        self.lock_timeout = options[:timeout]
+        self.loner = options[:loner]
       end
     end
 
@@ -144,18 +155,16 @@ module ActiveJobLock
     # Number of seconds the lock may be held for.
     # A value of 0 or below will lock without a timeout.
     #
-    # @param [Array] args job arguments
     # @return [Fixnum]
     def lock_timeout
-      @lock_timeout ||= 0
+      @lock_timeout ||= self.class.lock_timeout || 0
     end
 
     # Whether one instance of the job should be running or enqueued.
     #
-    # @param [Array] args job arguments
     # @return [TrueClass || FalseClass]
     def loner
-      @loner ||= false
+      @loner ||= self.class.loner || false
     end
 
     # Checks if job is locked or loner locked (if applicable).
