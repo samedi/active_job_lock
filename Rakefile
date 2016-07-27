@@ -1,6 +1,7 @@
 require 'rake/testtask'
 require 'yard'
 require 'yard/rake/yardoc_task'
+require 'bundler/gem_tasks'
 
 task :default => :test
 
