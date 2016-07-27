@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Perform some loose sanity checking that were in the correct directory first.
-if [ ! -f "Gemfile" ] || [ ! -f "resque-lock-timeout.gemspec" ]; then
+if [ ! -f "Gemfile" ] || [ ! -f "active_job_lock.gemspec" ]; then
 	echo "  ERROR: You may only run this script from the ROOT directory of the gem.  Aborting."
 	exit 1
 fi
