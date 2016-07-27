@@ -48,12 +48,6 @@ module ActiveJobLock
   module Core
     def self.included(base)
       base.extend(ClassMethods)
-
-      # Attach handler around the perform method to deal with the locking
-      #
-      base.class_eval do
-        around_perform { |job| job.perform_with_lock }
-      end
     end
 
     module ClassMethods
@@ -65,45 +59,52 @@ module ActiveJobLock
       end
     end
 
-    # @abstract
-    # if the job is a `loner`, enqueue only if no other same job
-    # is already running/enqueued
-    #
-    def enqueue(*_)
-      if loner
-        if locked?(*arguments)
-          # Same job is currently running
-          loner_enqueue_failed(*arguments)
-          return
-        else
-          acquire_loner_lock!(*arguments)
-        end
-      end
-      super
+    def initialize(*args)
+      super(*args)
+      self.extend(OverriddenMethods)
     end
 
-    # Where the magic happens.
-    #
-    def perform_with_lock
-      lock_until = acquire_lock!(*arguments)
+    module OverriddenMethods
+      # @abstract
+      # if the job is a `loner`, enqueue only if no other same job
+      # is already running/enqueued
+      #
+      def enqueue(*_)
+        if loner
+          if loner_locked?(*arguments)
+            # Same job is currently running
+            loner_enqueue_failed(*arguments)
+            return
+          else
+            acquire_loner_lock!(*arguments)
+          end
+        end
+        super
+      end
 
-      # Release loner lock as job has been dequeued
-      release_loner_lock!(*arguments) if loner
+      # Where the magic happens.
+      #
+      def perform(*arguments)
+        lock_until = acquire_lock!(*arguments)
 
-      # Abort if another job holds the lock.
-      return unless lock_until
+        # Release loner lock as job has been dequeued
+        release_loner_lock!(*arguments) if loner
 
-      begin
-        perform(*arguments)
-      ensure
-        # Release the lock on success and error. Unless a lock_timeout is
-        # used, then we need to be more careful before releasing the lock.
-        now = Time.now.to_i
-        if lock_until != true and lock_until < now
-          # Eeek! Lock expired before perform finished. Trigger callback.
-          lock_expired_before_release(*arguments)
-        else
-          release_lock!(*arguments)
+        # Abort if another job holds the lock.
+        return unless lock_until
+
+        begin
+          super(*arguments)
+        ensure
+          # Release the lock on success and error. Unless a lock_timeout is
+          # used, then we need to be more careful before releasing the lock.
+          now = Time.now.to_i
+          if lock_until != true and lock_until < now
+            # Eeek! Lock expired before perform finished. Trigger callback.
+            lock_expired_before_release(*arguments)
+          else
+            release_lock!(*arguments)
+          end
         end
       end
     end

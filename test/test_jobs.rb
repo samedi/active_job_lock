@@ -1,182 +1,49 @@
-# # Slow successful job, does not use timeout algorithm.
-# class SlowJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.perform
-#     $success += 1
-#     sleep 0.2
-#   end
-#
-#   def self.lock_failed(*args)
-#     $lock_failed += 1
-#   end
-# end
-#
-# # Fast successful job, does not use timeout algorithm.
-# class FastJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.perform
-#     $success += 1
-#   end
-#
-#   def self.lock_failed(*args)
-#     $lock_failed += 1
-#   end
-# end
-#
-# # Job that fails quickly, does not use timeout algorithm.
-# class FailingFastJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.perform
-#     raise
-#     $success += 1
-#   end
-# end
-#
-# # Job that fails with a SIGKILL
-# class FailingKilledJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.perform
-#     Process.kill("KILL", Process.pid)
-#   end
-# end
-#
-# # Job that enables the timeout algorithm.
-# class SlowWithTimeoutJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @lock_timeout = 60
-#
-#   def self.perform
-#     $success += 1
-#     sleep 0.2
-#   end
-# end
-#
-# # Job that releases its lock AFTER its expired.
-# class ExpireBeforeReleaseJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @lock_timeout = 1
-#
-#   def self.perform
-#     $success += 1
-#     sleep 2
-#   end
-#
-#   def self.lock_expired_before_release
-#     $lock_expired = true
-#   end
-# end
-#
-# # Job that uses a spesific redis connection just for storing locks.
-# class SpecificRedisJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.lock_redis
-#     @redis
-#   end
-#
-#   def self.lock_redis=(redis)
-#     @redis = redis
-#   end
-#
-#   def self.redis_lock_key
-#     'specific_redis'
-#   end
-#
-#   def self.perform
-#     $success += 1
-#     sleep 0.2
-#   end
-# end
-#
-# # Job that uses a different lock timeout value depending on job args.
-# class VariableTimeoutJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#
-#   def self.identifier(*args)
-#     nil
-#   end
-#
-#   def self.lock_timeout(extra_timeout)
-#     3600 * extra_timeout
-#   end
-#
-#   def self.perform
-#     $success += 1
-#   end
-# end
-#
-# # Job to simulate a long running job that refreshes its hold on the lock.
-# class RefreshLockJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @lock_timeout = 60
-# end
-#
-# # Job that prevents the job being enqueued if already enqueued/running.
-# class LonelyJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @loner = true
-#
-#   def self.perform
-#     $success += 1
-#     sleep 0.2
-#   end
-#
-#   def self.loner_enqueue_failed(*args)
-#     $enqueue_failed += 1
-#   end
-# end
-#
-# # Exclusive job (only one queued/running) with a timeout.
-# class LonelyTimeoutJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @loner = true
-#   @lock_timeout = 60
-#
-#   def self.perform
-#     $success += 1
-#     sleep 0.2
-#   end
-#
-#   def self.loner_enqueue_failed(*args)
-#     $enqueue_failed += 1
-#   end
-# end
-#
-# # This job won't complete before it's timeout
-# class LonelyTimeoutExpiringJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @loner = true
-#   @lock_timeout = 1
-#
-#   def self.perform
-#     sleep 2
-#   end
-# end
-#
-# # Job that raises an error after its timeout.
-# class FailingAfterTimeoutJob
-#   extend Resque::Plugins::LockTimeout
-#   @queue = :test
-#   @lock_timeout = 1
-#
-#   def self.perform
-#     sleep 2
-#     raise
-#   end
-# end
+# Job that executes quickly
+class FastJob < ActiveJob::Base
+  include ActiveJobLock::Core
+
+  class << self
+    attr_accessor :to_fail
+  end
+
+  def perform(*_)
+    raise if fail?
+    :performed
+  end
+
+  def fail?
+    self.class.to_fail
+  end
+end
+
+# Slow successful job, does not use timeout algorithm.
+class SlowJob < ActiveJob::Base
+  include ActiveJobLock::Core
+
+  def perform(*_)
+    sleep 1
+    return :performed
+  end
+end
+
+# Job that enables the timeout algorithm.
+class SuperSlowWithTimeoutJob < ActiveJob::Base
+  include ActiveJobLock::Core
+
+  lock timeout: 1
+
+  def perform(*_)
+    sleep 3
+    return :performed
+  end
+end
+
+# Job that can be enqueued one at a time
+class LonerJob < ActiveJob::Base
+  include ActiveJobLock::Core
+
+  lock loner: true
+
+  def perform(*_)
+  end
+end
